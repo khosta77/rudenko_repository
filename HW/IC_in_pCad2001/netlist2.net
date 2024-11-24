@@ -1,0 +1,155 @@
+#ifndef PROJECT_INCLUDE_MAT_H_
+#define PROJECT_INCLUDE_MAT_H_
+
+#include <iostream>
+#include <fstream>
+#include <cerrno>
+#include <cstddef>
+#include <vector>
+#include <string>
+#include <stdio.h>
+#include <setjmp.h>
+#include <cstring>
+#include <stdlib.h>
+#include <unistd.h>
+#include <math.h>
+#include <cmath>
+
+//extern "C" {  // jpeglib.h
+//#include <jconfig.h>
+//#include <jpeglib.h>
+//}
+
+//#include "Pixel.h"
+#define GRAY_CHANNEL 1
+#define RGB_CHANNEL 3
+
+#include "MyException.h"
+
+
+
+//typedef unsigned char uchar;
+using uchar = unsigned char;
+
+class Mat {
+private:
+    size_t rows;      /* Строки */
+    size_t cols;      /* Колонки */
+    size_t _channels;  /* По уолчанию картинка конвертируется в GRAY, но в будущем возможно использовать и RGB */
+
+    inline size_t absOmega() noexcept {   return rows * cols; }
+public: // 01.04.22 траблы с записью, чтением. надо чтобы публичным было
+    uchar *matrix;   /* Основной массив - он же матрица, т.к. двумерный */
+ 
+    /** \brief - метод переводит RGB изображение в серый
+     * \R - красный
+     * \G - зеленный
+     * \B - синий
+     * */
+    const float RedCoefficient = 0.299;
+    const float GreenCoefficient = 0.587;
+    const float BlueCoefficient = 0.114;
+    
+    inline uchar get_grey(const uchar &R, const uchar &G, const uchar &B) {
+        return uchar((R * RedCoefficient) + (G * GreenCoefficient) + (B * BlueCoefficient));
+    }
+
+public:
+
+    //// Constructor/destructor
+    /** \Array конструтор выделяющий память под массив
+     * \rows - строки
+     * \cols - колонки
+     * */
+    Mat(const size_t &cols = 0, const size_t &rows = 0, const size_t &channels = 1) : rows(rows), 
+                                                        cols(cols), _channels(channels) {
+        matrix = new uchar[rows * cols * channels]{};
+    }
+    /** \Array - конструтор копирования
+     * \arr - дрйгой объект класса Array
+     * */
+    Mat(const Mat& rhs);
+
+    /** \= - перегрузка опрератора =
+     * \arr - дрйгой объект класса Array
+     * \return - *this
+     * */
+    Mat& operator=(const Mat& rhs);
+
+    /** \brief - деструктор
+     * */
+    ~Mat() {    delete[] matrix; }
+    
+//------------------------------------------------------------------------------------------------------------
+    // Basic operations
+    inline size_t getRows() const noexcept {  return rows; }
+    inline size_t getCols() const noexcept {  return cols; }
+    inline int getChannels() const noexcept { return _channels; }
+
+    uchar operator[](const size_t &k) const noexcept { return this->matrix[k]; }
+    uchar& operator[](const size_t &k) noexcept { return this->matrix[k]; }
+
+    uchar at(const size_t &i, const size_t &j, const size_t &k = 0) const;
+    uchar& at(const size_t &i, const size_t &j, const size_t &k = 0);
+    Mat get_channel_matrix(const size_t &ch, const size_t &group_ch = 1);
+
+//------------------------------------------------------------------------------------------------------------
+
+    void resize(const size_t &rows = 0, const size_t &cols = 0, const size_t &channels = 1);
+    Mat submatrix(const size_t &ly, const size_t &ry, const size_t &lx, const size_t &rx);
+    bool compression() const noexcept;
+
+//------------------------------------------------------------------------------------------------------------
+
+    Mat grey();
+    Mat blackWhite(const uchar &lim);
+
+    /* \breif метод возращает "Среднее" значение.
+     * \param ch - цветовой канал
+     *     @GRAY 
+     *          ch = 0 - 1 канал, серый
+     *     @RGB
+     *          ch = 0 - красный
+     *          ch = 1 - зеленый
+     *          ch = 2 - синий
+     * */
+    double _muI(const size_t& ch = 0);
+
+    /* \brief Диспесия
+     * */
+    double _sigma2(const size_t& ch = 0);
+
+    /* \brief стандартное отклонение
+     * */
+    double _sigma(const size_t& ch = 0);
+
+    /*  \brief среднее значение трех цветов !!! не вызывать если надо еще и среднее других цветов
+     * */
+    double _avgColor(); 
+    std::vector<size_t> Histogram(const size_t& ch);
+    std::pair<uchar, uchar> _max_min(const size_t& ch);
+
+//------------------------------------------------------------------------------------------------------------
+
+    Mat OneOnOne(const Mat &mask);
+
+    /*  Баланс белого, исправит засвет определннного цвета
+     * */
+    Mat WhiteBalance();
+
+    /*  Баланс белого, исправит засвет определннного цвета
+     * */
+    Mat AutoLevels();
+
+//------------------------------------------------------------------------------------------------------------
+    friend std::pair<Mat, double> SAD(const Mat &A, const Mat &B);
+    friend std::pair<Mat, double> SSD(const Mat &A, const Mat &B);
+    friend std::pair<Mat, double> CC(const Mat &A, const Mat &B);
+};
+
+std::pair<Mat, double> SAD(const Mat &A, const Mat &B);
+std::pair<Mat, double> SSD(const Mat &A, const Mat &B);
+std::pair<Mat, double> CC(const Mat &A, const Mat &B); 
+
+
+#endif // PROJECT_INCLUDE_MAT_H_
